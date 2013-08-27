@@ -173,7 +173,7 @@
 				showSimilarWindow(false,0);
 				var buttonMouseOverTime = 0;
 
-				$('#wrapper').on('click','.list-novel',function(){
+				$('#wrapper').hammer().on('tap','.list-novel',function(){
 					showSimilar($(this).attr('id'));
 				});
 

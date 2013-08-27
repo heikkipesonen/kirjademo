@@ -171,7 +171,6 @@ function switcher(selector,opts){
 	this._animating = false;
 	this._animation_wait = false;
 
-
 	// response to the window size change
 	$(window).resize(function(){
 		me._scrollTo( me._getCenterPane() );
@@ -182,7 +181,7 @@ function switcher(selector,opts){
 	this._element.on('mousedown',function(e){
 		me._lastE = false;
 		me._dummy.stop();
-		me._totalDistance = 0;
+		me._totalDistance = 0;		
 	});
 
 	this._element.hammer().on('touchstart',function(e){

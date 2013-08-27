@@ -25,34 +25,12 @@ function recommender(el,opts){
 	});
 
 
-	/*
-	.packery({
-		transitionDuration:0,
-	})
-	*/
 	this._opts = {
 		similarities:opts.similarities || 10,
 		item:opts.item || false // 'U4ffqtDAQZO2T3eWfnOT9Q',
 	}
 	var me = this;
-	/*
-	this._container.find('#novel-info-inner-container').css({
-		height:window.innerHeight - 64
-	});
 
-	$(window).resize(function(){
-		me._container.find('#novel-info-inner-container').css({
-			height:window.innerHeight - 64
-		});
-	});
-*/
-	/*
-	this._history.addTo(this._container.find('#novel-breadcrumbs'));
-	this._history.onClick = function(item,index){			
-		me.showSimilar(item.getId());
-		me._history.returnToState( index );
-	}
-	*/
 	this._container.find('#novel-similar-list').on('click','.novel',function(){
 		me.showSimilar($(this).attr('id'));
 	});
