@@ -1,0 +1,390 @@
+<html lang="fi">
+	<head>
+		<meta charset="utf-8">
+		<meta name="apple-mobile-web-app-capable" content="yes">
+		<meta name="viewport" content="user-scalable=no, width=device-width, initial-scale=1, maximum-scale=1">
+		<script type="text/javascript" src="../src/jquery-2.0.0.min.js"></script>		
+		
+		<script type="text/javascript" src="../src/jquery.hammer.min.js"></script>
+		<!-- <script type="text/javascript" src="../src/imagesloaded.js"></script> -->
+
+
+		<script type="text/javascript" src="../src/iscroll.js"></script>
+		<script type="text/javascript" src="../src/jquery.transit.min.js"></script>
+
+
+		<script type="text/javascript" src="history.js"></script>
+		<script type="text/javascript" src="switcher.js"></script>
+		<script type="text/javascript" src="recommender.js"></script>
+
+		<link rel="stylesheet" type="text/css" href="main.css">
+		<link rel="stylesheet" type="text/css" href="recommender.css">
+		<link rel="stylesheet" type="text/css" href="novel-currentinfo.css">
+		<link rel="stylesheet" type="text/css" href="novel-list.css">
+		
+
+		<link rel="stylesheet" type="text/css" href="colors.css">
+
+		<script type="text/javascript">
+
+
+		$(function(){
+			var booksPerScreen = 40,
+				total = 0,
+				pages = [],
+				temp = $('#temp'),
+				bookWidth = window.innerWidth/10;
+
+			var similars = new recommender('#similarities',{similarities:24});
+
+
+			function get(data,callback){
+				$.ajax({
+					url:'elasticsearchproxy.php',
+					dataType:'json',
+					type:'POST',
+					data:data,
+					success:callback,
+					error:function(e){
+						callback(false,e)
+					}
+				});
+
+			}
+
+			function createPages(total){
+				var pages = Math.ceil(total / booksPerScreen);
+				var result = [];
+				var counter = 0;
+
+				for (var i = 0; i< pages;i++){
+					var now = counter+booksPerScreen;
+					now = now > total ? total : now;
+
+					result.push(counter+'-'+now);
+					counter += booksPerScreen;
+				}
+
+				return result;
+			}
+
+
+			get({
+				get:'manifests',
+				size:booksPerScreen,
+				offset:'0',
+				parse:'FALSE',
+			},function(e){				
+				if (e){							
+					total = e.hits.total;
+					pages = createPages(total);					
+					start();
+				}
+			});
+			//$('#recommender').recommender();
+
+			function getPosition(offset){
+				return parseInt(booksPerScreen) + parseInt(offset);
+			}
+
+			function getItemsToPane(pane){
+				var offset = pages[parseInt(pane.attr('list-index'))].split('-')[0];
+
+				if (pane.children().length < 3){
+
+					pane.empty();
+
+					$('#position-info').find('p').text( getPosition(offset) +'/'+ total);
+
+					get({
+						get:'manifests',
+						size:booksPerScreen,
+						offset:offset
+					},function(e){
+						addItemsToPage(e,pane);
+					});
+				}
+			}
+
+			function addItemsToPage(e,pane){
+				for (var i in e){
+					var img = '';
+					if (e[i].fields){
+
+					if (e[i].fields.MANIFEST_URL){					
+						if (e[i].fields.MANIFEST_URL.indexOf('+') !== -1){
+							img = e[i].fields.MANIFEST_URL.split(' + ')[0];
+						} else {
+							img = e[i].fields.MANIFEST_URL;
+						}
+
+						var score = '';
+						if (e[i].score){
+							score = e[i].score;
+						}
+
+						pane.append([
+							'<div class="list-novel" id="',e[i].fields.MANIFEST_RESOURCE,'" data-score="'+score+'">',
+								'<img src="img.php?img=',img,'&width=200" style="opacity:0"/>',
+							'</div>'
+						].join(''));
+
+
+						pane.find('img').each(function(){
+							$(this).load(function(){
+								$(this).css({
+									opacity:1
+								});
+							});
+						});
+					}
+
+					}
+				}
+			}
+
+			function start(){
+				var sw = $('#recommender').switcher({
+					items:pages,
+					paneWidth:'100%',
+					onchange:function(e,f){
+						getItemsToPane(this);
+					}
+				});
+
+
+
+				var d = false;
+				$('#search-text').keyup(function(e){
+					if (d){
+						clearTimeout(d);
+					}
+					d = setTimeout(function(){
+						makeSearch();
+					},1000);
+
+					if (e.keyCode == 13){
+						makeSearch();
+						clearTimeout(d);
+					}
+				});
+
+				getItemsToPane( $('#switcher-pane-2') );
+				showSimilarWindow(false,0);
+				var buttonMouseOverTime = 0;
+
+				$('#wrapper').on('click','.list-novel',function(){
+					showSimilar($(this).attr('id'));
+				});
+
+				$('#show-recommendations').click(function(){
+					showSimilarWindow();
+				});
+
+				$('.menu-screen-button').mouseenter(function(){
+					buttonMouseOverTime = Date.now();
+				});
+				$('.menu-screen-button').click(function(){
+					showPane($(this).attr('target'));
+				});
+				
+				$('#next').click(function(){
+					if (Date.now() - buttonMouseOverTime > 500){
+						sw.next();					
+					}
+				});
+				$('#prev').click(function(){
+					if (Date.now() - buttonMouseOverTime > 500){
+						sw.prev();
+					}
+				});				
+
+				/*
+
+
+				var similarTimeout = false;
+				$('#similarities').mouseenter(function(){
+					if (similarTimeout){
+						clearTimeout(similarTimeout);
+					}					
+				});
+				$('#similarities').mouseleave(function(){					
+					if (similarTimeout){
+						clearTimeout(similarTimeout);
+					}
+
+					similarTimeout=setTimeout(function(){
+						showSimilarWindow(false);
+					},500);
+				});
+				*/
+				var searchTimeout = false;
+				/*
+				$('#search-window').mouseenter(function(){
+					if (searchTimeout){
+						clearTimeout(searchTimeout);
+					}					
+				});
+				$('#search-window').mouseleave(function(){					
+					if (searchTimeout){
+						clearTimeout(searchTimeout);
+					}
+
+					searchTimeout = setTimeout(function(){
+						showSearchWindow(false);						
+					},500);
+				});
+				*/
+
+		//showSimilar('http://www.yso.fi/onto/kaunokki#Instance_ID12317600172003');
+			}
+
+			function showPane(pane,time){
+				var pos = false;
+				if (pane == 'list'){				
+					pos = '0%'
+				} else if (pane == 'search'){
+					pos = '-33%';
+					$('#search-text').focus();
+				 } else if (pane == 'similar'){
+				 	pos = '33%'
+				 }
+
+				 if (pos){
+					$('#pane-container').transition({
+						y:pos
+					},time);
+				 }
+			}
+
+			function showSimilarWindow(show,time){
+				if (show === false){
+					$('#pane-container').transition({
+						y:'0%'
+					},time)
+				} else {				
+					$('#pane-container').transition({
+						y:'33%'
+					},time);				
+				}				
+			}
+
+
+			function showSimilar(id){
+				get({
+					get:'novelinformation',
+					manifest_resource:id
+				},function(e){
+					if (e){
+						similars.showSimilar(e[0]._id);
+					}
+				});
+				
+				showSimilarWindow();
+			}
+
+			function makeSearch(){
+				if($('#search-text').val() != ''){
+				//searchText = text;
+					showPane('search');
+					var pane = $('#search-list-container');
+					pane.empty();
+					//makeSearch($('#search-text').val());			
+
+					get({
+						get:'search',
+						phrase:$('#search-text').val(),
+						index:'novel',
+						size:booksPerScreen,
+						offset:0
+					},function(e,err){
+						console.log(e)
+						e.sort(function(a,b){
+							return b._score - a._score;
+						})
+						var imgs = [];
+						for (var i in e){
+							imgs.push({fields:e[i]._source.MANIFEST_RESOURCES[0],score:e[i]._score});
+						}
+
+						addItemsToPage(imgs,pane);
+
+					});
+				}
+			}
+		});
+		</script>
+	</head>
+<body>	
+	<div id="temp">
+	</div>
+	<div id="wrapper">
+
+		<div id="pane-container">
+			<div id="similarities">
+			</div>
+
+			<div id="recommender">
+
+			</div>
+
+			<div id="search-list">
+				<div id="search-list-container">
+
+				</div>			
+			</div>
+
+		</div>
+
+		<div id="right-menu">
+			<div class="menu-screen-button" id="novel-similarities-list" target="similar">
+				<img src="icons/365.png" />
+			</div>
+			
+			<div class="menu-screen-button" id="novel-list" target="list">
+				<img src="icons/024.png" />
+				<div id="prev" class="menu-button">
+					<img src="icons/122.png" />
+				</div>			
+				<div id="next" class="menu-button">
+					<img src="icons/120.png" />
+				</div>		
+	
+			</div>
+			
+			<div class="menu-screen-button" id="search-results-list" target="search">
+					<img src="icons/061.png" />
+				
+					<input type="text" id="search-text" placeholder="viuuuuuuuuuuuuuuuu" />
+				
+
+			</div>
+			
+
+			<!---
+			<div id="position-info">
+				<p></p>
+			</div>			
+				
+			-->
+<!--
+			<div id="show-recommendations" class="menu-button">
+				<img src="icons/365.png" />
+			</div>			
+			<div id="grid" class="menu-button">
+				<img src="icons/024.png" />
+			</div>			
+-->
+
+<!--
+			<div id="shit" class="menu-button">
+				<img src="icons/203.png" />
+			</div>			
+-->
+		</div>			
+
+
+
+	</div>
+</body>	
+</html>
